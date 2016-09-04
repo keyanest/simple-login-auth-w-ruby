@@ -4,18 +4,78 @@ require 'csv'
 require 'pry'
 
 class Session
+attr_reader :authorized_username
 
   def initialize
-    @username = nil
-    @password = nil
-    @input_init = nil
-    @input_user_fail = nil
+    @authorized_username = nil
     @input_pw_fail = nil
-    @authorized_user = nil
-    @authentications =[]
-    @new_username = nil
-    @new_password = nil
+    @authentications = []
+    @pw_attempts = 0
   end
+
+  def prepare_database
+    csv_scrape("testusers.csv")
+  end
+
+  def has_account?
+    print "Do you have already have an account? (Y/N) "
+    have_account = yes_no_initial
+    if have_account == 'y'
+      return true
+    else
+      return false
+    end
+  end
+
+  def username_auth
+    print "Please enter a username: "
+    typed_username = gets.chomp.downcase
+    return match_username?(typed_username)
+  end
+
+  def create_account
+    print "Please choose a username: "
+    new_username = gets.chomp.downcase
+    print "Please choose password: "
+    new_password = gets.chomp.downcase
+    CSV.open("./testusers.csv", "ab") do |csv|
+      csv << [new_username, new_password ]
+    end
+  end
+
+  def failed_username
+    print "Sorry that is not a valid username. Would you like to try again? "
+    input_user_fail = gets.chomp.downcase
+    if input_user_fail == "y"
+      return true
+    else
+      return false
+    end
+  end
+
+  def failed_password
+    puts "Sorry, we could not access your account please try again later."
+  end
+
+  def pw_validated?
+    while @pw_attempts < 3 && !@password_match
+      if @pw_attempts == 0
+        print "Please enter password: "
+      else
+        print "Sorry, that password is incorrect, please enter your password: "
+      end
+      typed_password = gets.chomp.downcase
+      @pw_attempts += 1
+      @password_match = match_password?(typed_password)
+    end
+    return @password_match
+  end
+
+  def login
+    puts "You are now logged in!"
+  end
+
+  private
 
   def csv_scrape(test_file)
     CSV.foreach(test_file, headers: true, header_converters: :symbol ) do |row|
@@ -24,69 +84,21 @@ class Session
     end
   end
 
-  def run_auth
-    puts "Do you have already have an account? (Y/N)"
-    @input_init = gets.chomp.downcase
-    yes_no_initial
-  end
-
   def yes_no_initial
-    if @input_init != "y" && @input_init != "n"
+    answer = gets.chomp.downcase
+    while answer != 'y' && answer != 'n'
       puts "Please type Y or N."
-    elsif @input_init == "n"
-      puts "Please create account."
-      create_account
-    elsif @input_init == 'y'
-      username_auth
+      answer = gets.chomp.downcase
     end
+    return answer
   end
 
-  def create_account
-    puts "Please choose a username."
-    @new_username = gets.chomp.downcase
-    puts "Please choose password."
-    @new_password = gets.chomp.downcase
-    CSV.open("./testusers.csv", "ab") do |csv|
-      csv << [@new_username, @new_password ]
-    end
+  def match_username?(typed_username)
+    @authorized_username = @authentications.find { |userobj| userobj.username == typed_username }
   end
 
-  def username_auth
-    print "Please enter a username:"
-    @username = gets.chomp.downcase
-    @authorized_user = @authentications.find { |userobj| userobj.username == @username }
-    if @authorized_user
-      pw_authorization
-    else
-      print "Sorry that is not a valid username. Would you like to try again?"
-      @input_user_fail = gets.chomp.downcase
-      if @input_user_fail == "y"
-        username_auth
-      else
-        create_account
-      end
-    end
+  def match_password?(typed_password)
+    @authorized_username.password == typed_password
   end
 
-  def pw_authorization
-    pw_attempts = 0
-    print "Please enter password:"
-    @password = gets.chomp.downcase
-    pw_attempts += 1
-    if @authorized_user.password == @password
-      puts "You are now logged in!"
-    else
-      if pw_attempts < 3
-        puts "Sorry, that password is incorrect, Would you like to try again?"
-        @input_pw_fail = gets.chomp.downcase
-        if @input_pw_fail == 'y'
-          pw_authorization
-        else
-          create_account
-        end
-      else
-        puts "Sorry, we could not access your account please try again later."
-      end
-    end
-  end
 end
